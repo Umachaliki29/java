@@ -1,0 +1,31 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: us-east-1
+    BASE_IMAGE_REPO: java-base
+    APP_IMAGE_REPO: java-app
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging into ECR...
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - BASE_IMAGE=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BASE_IMAGE_REPO:latest
+      - APP_IMAGE=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_IMAGE_REPO:latest
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo Build and push base image
+      - docker build -f Dockerfile --target base -t $BASE_IMAGE .
+      - docker push $BASE_IMAGE
+
+      - echo Build and push app image using base image
+      - docker build --build-arg BASE_IMAGE=$BASE_IMAGE -t $APP_IMAGE .
+      - docker push $APP_IMAGE
+
+artifacts:
+  files:
+    - Dockerfile
+    - target/myapp.jar
